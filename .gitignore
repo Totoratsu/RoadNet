@@ -1,3 +1,5 @@
+decisionNeuralNetwork/checkpoints
 venv
 .env
 __pycache__
+data/
