@@ -1,0 +1,31 @@
+# Decision Neural Network - Training Requirements
+# Full dependencies for training driving decision models
+
+# Core PyTorch and ML dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.21.0
+pillow>=8.0.0
+
+# Data science and machine learning
+scikit-learn>=1.0.0
+matplotlib>=3.5.0
+
+# Training and progress tracking
+tqdm>=4.60.0
+tensorboard>=2.10.0
+
+# Data augmentation (for geometric transforms)
+torchvision>=0.15.0  # includes transforms
+
+# GUI support for annotation tools
+tkinter  # Usually included with Python, but may need separate install on some systems
+
+# File handling and utilities
+json  # Built-in Python module
+os    # Built-in Python module
+glob  # Built-in Python module
+
+# Optional but recommended:
+# - CUDA-enabled PyTorch for GPU training
+# - More memory for larger batch sizes during training

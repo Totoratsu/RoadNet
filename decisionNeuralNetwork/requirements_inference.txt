@@ -1,0 +1,24 @@
+# Decision Neural Network - Inference Requirements
+# Minimal dependencies for running inference with trained decision models
+
+# Core PyTorch and ML dependencies (required)
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.21.0
+pillow>=8.0.0
+
+# Optional: For visualization and GUI interfaces
+matplotlib>=3.5.0  # For plotting confidence charts and visualizations
+tkinter            # For GUI inference interface (test_inference_gui.py)
+
+# Optional: For batch analysis and reporting
+scikit-learn>=1.0.0  # For classification reports and metrics
+
+# Progress tracking (minimal overhead)
+tqdm>=4.60.0
+
+# Note: For production inference deployment, consider:
+# - torch (CPU-only version) for smaller footprint if no GPU
+# - ONNX runtime for cross-platform inference
+# - TensorRT for NVIDIA GPU optimization
+# - CoreML for Apple Silicon optimization

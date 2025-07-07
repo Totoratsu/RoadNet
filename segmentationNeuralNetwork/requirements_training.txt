@@ -1,0 +1,52 @@
+# Segmentation Neural Network - Training Requirements
+# Full dependencies for training UNet models optimized for real-time inference
+
+# Core PyTorch and ML dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.21.0
+pillow>=8.0.0
+
+# Segmentation-specific models and utilities
+segmentation_models_pytorch>=0.5.0
+timm>=0.9.0
+
+# Data science and visualization for training
+matplotlib>=3.5.0
+scikit-learn>=1.0.0
+
+# Image processing and augmentation
+albumentations>=1.3.0
+
+# Training utilities and monitoring
+tqdm>=4.60.0
+tensorboard>=2.10.0
+
+# Jupyter notebook support (for main.ipynb)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# File handling and configuration
+PyYAML>=6.0.0
+python-dotenv>=1.0.0
+
+# Model optimization and conversion (optional)
+# onnx>=1.12.0                    # For ONNX export
+# onnxruntime>=1.12.0             # For ONNX inference testing
+# nvidia-tensorrt                 # For TensorRT optimization (NVIDIA GPUs)
+
+# Real-time optimization notes:
+# 1. For driving applications, consider lightweight encoders:
+#    - mobilenet_v2 (fastest)
+#    - efficientnet-b0 (balanced)
+#    - resnet18 (good quality/speed tradeoff)
+#
+# 2. Training optimizations for real-time models:
+#    - Use smaller input resolutions (256x512 instead of 512x1024)
+#    - Apply knowledge distillation from larger models
+#    - Use mixed precision training (automatic with newer PyTorch)
+#
+# 3. For maximum speed during training:
+#    - Use DataLoader with num_workers=4-8
+#    - Enable pin_memory=True for GPU training
+#    - Use torch.compile() for PyTorch 2.0+

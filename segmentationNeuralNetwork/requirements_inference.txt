@@ -1,0 +1,39 @@
+# Segmentation Neural Network - Real-time Inference Requirements
+# Optimized for fast inference suitable for driving scenarios
+
+# Core PyTorch and ML dependencies (required)
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.21.0
+pillow>=8.0.0
+
+# Segmentation models (for loading pre-trained models)
+segmentation_models_pytorch>=0.5.0
+
+# Basic utilities for progress tracking
+tqdm>=4.60.0
+
+# Optional: For visualization during inference
+matplotlib>=3.5.0
+
+# Optional: For video processing and camera input
+opencv-python>=4.5.0  # For real-time video processing
+
+# Performance monitoring
+psutil>=5.8.0  # For system resource monitoring
+
+# Real-time Optimization Notes:
+# 1. For maximum speed, install PyTorch with CUDA support:
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# 
+# 2. For Apple Silicon (M1/M2), ensure MPS support:
+#    PyTorch 2.0+ automatically uses MPS when available
+#
+# 3. For production deployment, consider:
+#    - TensorRT for NVIDIA GPUs: pip install nvidia-tensorrt
+#    - ONNX runtime: pip install onnxruntime-gpu
+#    - Intel OpenVINO: pip install openvino
+#
+# 4. For embedded systems (Raspberry Pi, Jetson):
+#    - Use quantized models (INT8)
+#    - Consider TensorFlow Lite: pip install tflite-runtime
