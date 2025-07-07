@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Stable Model Demo
-Test and visualize our trained stable segmentation model on Unity test data.
+Universal Segmentation Model Demo
+Test and visualize trained segmentation models (Stable or Fast) on Unity test data.
+Automatically detects model architecture and loads appropriate configuration.
 Interactive interface with performance analysis.
 """
 
@@ -22,14 +23,14 @@ import segmentation_models_pytorch as smp
 from unity_dataset import UnitySegmentationDataset
 
 class StableSegmentationDemo:
-    """Interactive demo for testing our stable segmentation model."""
+    """Interactive demo for testing segmentation models (both Stable and Fast)."""
     
     def __init__(self, model_path: str = 'checkpoints_stable/best_model.pth', data_dir: str = '../data'):
-        """Initialize the demo with our stable model."""
+        """Initialize the demo with any segmentation model."""
         self.model_path = model_path
         self.data_dir = data_dir
         
-        print(f"🚗 Loading Stable Segmentation Demo")
+        print(f"🚗 Loading Universal Segmentation Demo")
         print(f"   Model: {model_path}")
         print(f"   Data: {data_dir}")
         
@@ -38,8 +39,8 @@ class StableSegmentationDemo:
                                   'cuda' if torch.cuda.is_available() else 'cpu')
         print(f"   Device: {self.device}")
         
-        # Load our stable model (same architecture as training)
-        self.model = self._load_stable_model()
+        # Load model (automatically detects architecture)
+        self.model = self._load_model()
         
         # Load test dataset
         self.test_dataset = UnitySegmentationDataset(data_dir, split='test')
@@ -60,30 +61,59 @@ class StableSegmentationDemo:
         # Color mapping for visualization
         self.colors = self._create_color_map()
         
-    def _load_stable_model(self):
-        """Load our stable training model (MobileNetV2 UNet)"""
-        # Create the same model architecture as in training
-        model = smp.Unet(
-            encoder_name="mobilenet_v2",
-            encoder_weights="imagenet", 
-            in_channels=3,
-            classes=12,
-            activation=None
-        )
+    def _load_model(self):
+        """Load model automatically detecting architecture (MobileNetV2 or EfficientNet-B0)"""
+        # Load checkpoint first to check metadata (fix for PyTorch 2.6)
+        checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=False)
         
-        # Load checkpoint
-        checkpoint = torch.load(self.model_path, map_location=self.device)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        # Try to detect model type from path or checkpoint info
+        is_fast_model = 'fast' in self.model_path or 'efficientnet' in self.model_path.lower()
+        
+        if is_fast_model:
+            print("🚀 Detected Fast Model (EfficientNet-B0)")
+            # Fast model architecture - EfficientNet-B0 with reduced decoder
+            model = smp.Unet(
+                encoder_name="efficientnet-b0",
+                encoder_weights="imagenet",
+                in_channels=3,
+                classes=12,
+                activation=None,
+                decoder_channels=[128, 64, 32, 16, 8]  # Reduced decoder channels
+            )
+        else:
+            print("🏗️ Detected Stable Model (MobileNetV2)")
+            # Stable model architecture - MobileNetV2 with default decoder
+            model = smp.Unet(
+                encoder_name="mobilenet_v2",
+                encoder_weights="imagenet", 
+                in_channels=3,
+                classes=12,
+                activation=None
+            )
+        
+        # Load model weights
+        try:
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"✅ Model loaded successfully from epoch {checkpoint['epoch']}")
+        except Exception as e:
+            print(f"⚠️ Error loading model state: {e}")
+            print("   Trying to load with strict=False...")
+            model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+            print("✅ Model loaded with relaxed matching")
+        
         model = model.to(self.device)
         model.eval()
         
-        print(f"✅ Model loaded from epoch {checkpoint['epoch']}")
         print(f"   Best validation loss: {checkpoint['val_loss']:.4f}")
+        
+        # Print performance info if available
+        if 'estimated_fps' in checkpoint:
+            print(f"   Estimated FPS: {checkpoint['estimated_fps']:.1f}")
         
         return model
     
     def _predict_image(self, image):
-        """Make prediction with our stable model"""
+        """Make prediction with the model"""
         with torch.no_grad():
             if len(image.shape) == 3:
                 image = image.unsqueeze(0)  # Add batch dimension
@@ -93,7 +123,70 @@ class StableSegmentationDemo:
             prediction = torch.argmax(output, dim=1)
             
             return prediction.cpu().numpy()[0]
+    
+    def measure_inference_speed(self, num_samples=10):
+        """Measure real-time inference speed for driving assessment"""
+        print(f"\n🏁 Measuring Real-Time Performance ({num_samples} samples)")
+        print("=" * 50)
         
+        inference_times = []
+        
+        # Warm up the model
+        print("🔥 Warming up model...")
+        for _ in range(3):
+            sample_idx = random.randint(0, len(self.test_dataset) - 1)
+            image, _ = self.test_dataset[sample_idx]
+            _ = self._predict_image(image)
+        
+        print("⏱️ Measuring inference times...")
+        
+        for i in range(num_samples):
+            sample_idx = random.randint(0, len(self.test_dataset) - 1)
+            image, _ = self.test_dataset[sample_idx]
+            
+            # Measure pure inference time
+            start_time = time.time()
+            _ = self._predict_image(image)
+            inference_time = time.time() - start_time
+            
+            inference_times.append(inference_time)
+            
+            if i % 5 == 0:
+                current_fps = 1 / inference_time
+                print(f"   Sample {i+1}: {inference_time*1000:.1f}ms ({current_fps:.1f} FPS)")
+        
+        # Calculate statistics
+        avg_time = np.mean(inference_times)
+        min_time = np.min(inference_times)
+        max_time = np.max(inference_times)
+        std_time = np.std(inference_times)
+        
+        avg_fps = 1 / avg_time
+        min_fps = 1 / max_time
+        max_fps = 1 / min_time
+        
+        print(f"\n📊 Performance Results:")
+        print(f"   Average: {avg_time*1000:.1f}ms ({avg_fps:.1f} FPS)")
+        print(f"   Best:    {min_time*1000:.1f}ms ({max_fps:.1f} FPS)")
+        print(f"   Worst:   {max_time*1000:.1f}ms ({min_fps:.1f} FPS)")
+        print(f"   Std Dev: {std_time*1000:.1f}ms")
+        
+        print(f"\n🚗 Real-Time Driving Assessment:")
+        if avg_fps >= 30:
+            print(f"   ✅ EXCELLENT for real-time driving ({avg_fps:.1f} FPS >= 30 FPS)")
+            print(f"   ✅ Smooth and responsive for autonomous navigation")
+        elif avg_fps >= 20:
+            print(f"   ⚠️  GOOD for driving ({avg_fps:.1f} FPS >= 20 FPS)")
+            print(f"   ⚠️  Adequate but may feel slightly delayed")
+        elif avg_fps >= 15:
+            print(f"   ⚠️  MARGINAL for driving ({avg_fps:.1f} FPS >= 15 FPS)")
+            print(f"   ⚠️  Noticeable delay, not ideal for high-speed driving")
+        else:
+            print(f"   ❌ TOO SLOW for real-time driving ({avg_fps:.1f} FPS < 15 FPS)")
+            print(f"   ❌ Significant delay, unsafe for autonomous navigation")
+        
+        return avg_fps, inference_times
+    
     def _create_color_map(self):
         """Create color map for visualization."""
         colors = np.zeros((self.NUM_CLASSES, 3), dtype=np.uint8)
@@ -412,13 +505,15 @@ class StableSegmentationDemo:
 
 def main():
     """Main demo function."""
-    parser = argparse.ArgumentParser(description='Stable Segmentation Model Demo')
+    parser = argparse.ArgumentParser(description='Universal Segmentation Model Demo')
     parser.add_argument('--model', type=str, default='checkpoints_stable/best_model.pth', 
                        help='Path to trained model checkpoint')
     parser.add_argument('--data_dir', type=str, default='../data', help='Data directory')
     parser.add_argument('--batch_analysis', action='store_true', help='Run batch analysis')
     parser.add_argument('--num_samples', type=int, help='Number of samples for batch analysis')
     parser.add_argument('--sample', type=int, default=0, help='Sample index to show (if not interactive)')
+    parser.add_argument('--performance_test', action='store_true', help='Run performance/speed test')
+    parser.add_argument('--speed_samples', type=int, default=20, help='Number of samples for speed test')
     
     args = parser.parse_args()
     
@@ -426,15 +521,24 @@ def main():
     if not Path(args.model).exists():
         print(f"❌ Model not found: {args.model}")
         print("   Available models:")
-        stable_dir = Path("checkpoints_stable")
-        if stable_dir.exists():
-            for model_file in stable_dir.glob("*.pth"):
-                print(f"     - {model_file}")
+        
+        # Check both stable and fast checkpoints
+        for checkpoint_dir in ["checkpoints_stable", "checkpoints_fast"]:
+            checkpoint_path = Path(checkpoint_dir)
+            if checkpoint_path.exists():
+                print(f"   {checkpoint_dir}/:")
+                for model_file in checkpoint_path.glob("*.pth"):
+                    print(f"     - {model_file}")
         return
     
     try:
         # Create demo
         demo = StableSegmentationDemo(args.model, args.data_dir)
+        
+        # Run performance test if requested
+        if args.performance_test:
+            avg_fps, _ = demo.measure_inference_speed(args.speed_samples)
+            return avg_fps
         
         if args.batch_analysis:
             # Run batch analysis
