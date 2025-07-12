@@ -177,13 +177,6 @@
         "com.unity.modules.terrain": "1.0.0"
       }
     },
-    "com.unity.scripting.python": {
-      "version": "7.0.2",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {},
-      "url": "https://packages.unity.com"
-    },
     "com.unity.searcher": {
       "version": "4.9.3",
       "depth": 2,
