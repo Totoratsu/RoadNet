@@ -9,7 +9,7 @@ import os
 
 # Add the train directory to the path to import the model
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'train'))
-from train import SegmentationModel
+from train import UNetResNet18
 
 
 class DrivingSegmentationInference:
@@ -61,19 +61,19 @@ class DrivingSegmentationInference:
     def _load_model(self):
         """Load the trained model"""
         # Create model (same as training)
-        model = SegmentationModel(num_classes=5)
-        
+        model = UNetResNet18(num_classes=5)
+
         # Load weights
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model file not found: {self.model_path}")
-        
+
         state_dict = torch.load(self.model_path, map_location=self.device)
         model.load_state_dict(state_dict)
-        
+
         # Move to device and set to eval mode
         model.to(self.device)
         model.eval()
-        
+
         return model
     
     def _preprocess_image(self, image):
@@ -81,14 +81,16 @@ class DrivingSegmentationInference:
         # Convert to RGB if needed
         if image.mode != 'RGB':
             image = image.convert('RGB')
-        
+
         # Convert to tensor and normalize (same as training)
         image_array = np.array(image)
         image_tensor = torch.from_numpy(image_array).permute(2, 0, 1).float() / 255.0
-        
+        # Normalize using ImageNet mean and std
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        image_tensor = (image_tensor - mean) / std
         # Add batch dimension
         image_tensor = image_tensor.unsqueeze(0)
-        
         return image_tensor
     
     def _create_colored_mask(self, pred_mask):

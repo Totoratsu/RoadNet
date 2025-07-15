@@ -36,17 +36,17 @@ class DrivingDataset(Dataset):
             angle = random.uniform(-15, 15)
             image = TF.rotate(image, angle, interpolation=Image.BILINEAR)
             mask = TF.rotate(mask, angle, interpolation=Image.NEAREST)
-        
+
         # Random horizontal stretch (0.8x to 1.2x)
         if random.random() > 0.5:
             original_size = image.size
             stretch_factor = random.uniform(0.8, 1.2)
             new_width = int(original_size[0] * stretch_factor)
-            
+
             # Resize with stretch
             image = image.resize((new_width, original_size[1]), Image.BILINEAR)
             mask = mask.resize((new_width, original_size[1]), Image.NEAREST)
-            
+
             # Crop or pad back to original size
             if new_width > original_size[0]:
                 # Crop center
@@ -58,15 +58,29 @@ class DrivingDataset(Dataset):
                 pad_width = original_size[0] - new_width
                 left_pad = pad_width // 2
                 right_pad = pad_width - left_pad
-                
+
                 new_image = Image.new('RGB', original_size, (0, 0, 0))
                 new_image.paste(image, (left_pad, 0))
                 image = new_image
-                
+
                 new_mask = Image.new('L', original_size, 0)
                 new_mask.paste(mask, (left_pad, 0))
                 mask = new_mask
-        
+
+        # Random crop and resize back to original size
+        if random.random() > 0.5:
+            crop_scale = random.uniform(0.7, 1.0)  # Crop between 70% and 100% of original size
+            orig_w, orig_h = image.size
+            crop_w, crop_h = int(orig_w * crop_scale), int(orig_h * crop_scale)
+            if crop_w < orig_w and crop_h < orig_h:
+                left = random.randint(0, orig_w - crop_w)
+                top = random.randint(0, orig_h - crop_h)
+                image = image.crop((left, top, left + crop_w, top + crop_h))
+                mask = mask.crop((left, top, left + crop_w, top + crop_h))
+                # Resize back to original size
+                image = image.resize((orig_w, orig_h), Image.BILINEAR)
+                mask = mask.resize((orig_w, orig_h), Image.NEAREST)
+
         return image, mask
     
     def __len__(self):
@@ -100,8 +114,11 @@ class DrivingDataset(Dataset):
         
         # Convert to tensors
         image = torch.from_numpy(np.array(image)).permute(2, 0, 1).float() / 255.0
+        # Normalize using ImageNet mean and std
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        image = (image - mean) / std
         mask = torch.from_numpy(np.array(mask)).long()
-        
         return image, mask
 
 
