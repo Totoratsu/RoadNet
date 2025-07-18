@@ -2,12 +2,18 @@ using UnityEngine;
 using Python.Runtime;
 using System;
 using System.IO;
-using System.Collections;  
+using System.Collections;
+using UnityEngine.Rendering;
 
 
 public class test_python : MonoBehaviour
 {
+    [Header("Frame Capturing Settings")]
     public Camera camara;
+    public int width = 600, height = 600;
+    public float InitialFrameCapturingCooldown = 1f;
+    public float FrameCapturingInterval = 0.25f;
+    private Coroutine _frameAnalysisCoroutine;
 
     private PyObject funcion;
 
@@ -40,7 +46,6 @@ public class test_python : MonoBehaviour
 
             // 4) Importa por primera vez tu script
             funcion = Py.Import("test").GetAttr("guardar_imagen_desde_string");
-
         }
     }
 
@@ -53,40 +58,39 @@ public class test_python : MonoBehaviour
             PythonEngine.Shutdown();
     }
 
-    // Update is called once per frame
     void Start()
     {
-        using (Py.GIL())
-        {
-            StartCoroutine(
-                CaptureFrameAsBase64Coroutine(camara, 600, 600, base64Str =>
-                {
-                    using (PyObject pyStr = new PyString(base64Str))
-                    using (PyObject name = new PyString("hola.png"))
-                    using (funcion.Invoke(new PyObject[] { pyStr, name }));
-                })
-            );
-        }
+        _frameAnalysisCoroutine = StartCoroutine(
+            CaptureFrameRoutine(camara, width, height)
+        );
     }
-    
-    IEnumerator CaptureFrameAsBase64Coroutine(Camera cam, int width, int height, Action<string> callback) {
-        var rt = new RenderTexture(width, height, 24);
-        cam.targetTexture = rt;
-        cam.Render();
 
-        RenderTexture.active = rt;
-        var tex = new Texture2D(width, height, TextureFormat.ARGB32, false);
-        tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-        tex.Apply();
+    void AnalizeFrame(AsyncGPUReadbackRequest req)
+    {
+        if (req.hasError) {
+            Debug.LogError("Error en GPU Readback");
+            return;
+        }
 
-        cam.targetTexture = null;
-        RenderTexture.active = null;
-        Destroy(rt);
+        byte[] data = req.GetData<byte>().ToArray();
+    }
 
-        byte[] png = tex.EncodeToPNG();
-        Destroy(tex);
+    IEnumerator CaptureFrameRoutine(Camera cam, int width, int height) {
+        yield return new WaitForSeconds(InitialFrameCapturingCooldown);
 
-        callback(Convert.ToBase64String(png));
-        yield return null;
+        while (true)
+        {
+            yield return new WaitForSeconds(FrameCapturingInterval);
+            yield return null; // Wait for the next frame to end (for rendering)
+
+            var rt = new RenderTexture(width, height, 24);
+            cam.targetTexture = rt;
+            cam.Render();
+            cam.targetTexture = null;
+
+            AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, AnalizeFrame);
+
+            RenderTexture.ReleaseTemporary(rt);
+        }
     }
 }
