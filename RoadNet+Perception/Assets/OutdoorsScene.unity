@@ -742,6 +742,7 @@ MonoBehaviour:
   - rid: 989769963415011395
   - rid: 989769963415011396
   - rid: 989769963415011397
+  - rid: 542603937617018880
   m_LayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -760,6 +761,12 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 542603937617018880
+      type: {class: DepthLabeler, ns: UnityEngine.Perception.GroundTruth.Labelers, asm: Unity.Perception.Runtime}
+      data:
+        enabled: 1
+        annotationId: Depth
+        measurementStrategy: 0
     - rid: 989769963190878403
       type: {class: UnityCameraSensor, ns: UnityEngine.Perception.GroundTruth.Sensors, asm: Unity.Perception.Runtime}
       data:
@@ -957,12 +964,16 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 838440195}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1fe7445e86983184c9dc18e27d684d83, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   camara: {fileID: 827811647}
+  width: 600
+  height: 600
+  InitialFrameCapturingCooldown: 1
+  FrameCapturingInterval: 0.25
 --- !u!4 &838440197
 Transform:
   m_ObjectHideFlags: 0

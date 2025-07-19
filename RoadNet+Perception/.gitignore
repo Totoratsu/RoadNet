@@ -4,6 +4,9 @@
 #/Assets/TextMesh Pro
 /Assets/StreamingAssets/embedded-python
 
+## Duplicated python code for unity
+/Assets/StreamingAssets/python/inference
+
 # This .gitignore file should be placed at the root of your Unity project directory
 #
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
