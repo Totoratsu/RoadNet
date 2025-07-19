@@ -11,10 +11,11 @@ class DrivingDataset(Dataset):
     # Color mapping from Unity segmentation
     COLOR_TO_CLASS = {
         (255, 255, 255): 0,  # road 
-        (192, 183, 77): 1,   # building
-        (83, 21, 168): 2,    # car
-        (255, 0, 0): 3,      # traffic_light
-        (255, 0, 121): 4,    # road_block
+        (192, 183, 77):   1, # building
+        (83, 21, 168):    2, # car
+        (255, 0, 0):      3, # traffic_light
+        (255, 0, 121):    4, # road_block
+        (0, 0, 0):        5, # unknown/unlabeled - black
     }
     
     def __init__(self, data_dir, augment=True):
@@ -99,8 +100,10 @@ class DrivingDataset(Dataset):
         
         # Convert colors to class indices first
         seg_array = np.array(seg_image)
-        mask_array = np.zeros(seg_array.shape[:2], dtype=np.uint8)
-        
+        # Initialize all pixels as unknown (class 5)
+        # Initialize all pixels as unknown (class 5)
+        mask_array = np.full(seg_array.shape[:2], 5, dtype=np.uint8)
+
         for color, class_id in self.COLOR_TO_CLASS.items():
             color_mask = np.all(seg_array == color, axis=2)
             mask_array[color_mask] = class_id

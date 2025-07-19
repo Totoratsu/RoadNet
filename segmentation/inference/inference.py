@@ -6,6 +6,7 @@ import numpy as np
 from pathlib import Path
 import sys
 import os
+import io
 
 # Add the train directory to the path to import the model
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'train'))
@@ -28,6 +29,7 @@ class DrivingSegmentationInference:
         2: (83, 21, 168),    # car - purple
         3: (255, 0, 0),      # traffic_light - red
         4: (255, 0, 121),    # road_block - pink
+        255: (0, 0, 0),      # unknown/unlabeled - black
     }
     
     def __init__(self, model_path=None, device=None):
@@ -104,6 +106,31 @@ class DrivingSegmentationInference:
         
         return Image.fromarray(colored)
     
+    def predict_bytes(self, image_bytes: bytes) -> bytes:
+        """Run inference on image bytes and return PNG bytes of colored mask"""
+        # Load image from bytes
+        buf = io.BytesIO(image_bytes)
+        image = Image.open(buf)
+        
+        # Preprocess
+        input_tensor = self._preprocess_image(image).to(self.device)
+        
+        # Inference
+        with torch.no_grad():
+            outputs = self.model(input_tensor)
+            predictions = torch.argmax(outputs, dim=1)
+        
+        # Convert to numpy mask
+        pred_mask = predictions.cpu().numpy()[0]
+        
+        # Create colored mask
+        colored_mask = self._create_colored_mask(pred_mask)
+        
+        # Save to PNG bytes
+        out_buf = io.BytesIO()
+        colored_mask.save(out_buf, format='PNG')
+        return out_buf.getvalue()
+
     def __call__(self, image_path, save=False):
         """
         Call the inference like a PyTorch module.
@@ -140,7 +167,6 @@ class DrivingSegmentationInference:
             print(f"Segmentation saved as: {output_path}")
         
         return colored_mask
-
 
 if __name__ == "__main__":
     # Example usage

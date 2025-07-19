@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from pathlib import Path
 import torchvision.models as models
 from driving_dataset import DrivingDataset
 
@@ -9,7 +10,7 @@ from driving_dataset import DrivingDataset
 # --- U-Net with ResNet18 encoder ---
 class UNetResNet18(nn.Module):
     def __init__(self, num_classes=5):
-        super().__init__()
+        super().__init__()  # Initialize the parent class
         resnet = models.resnet18(pretrained=True)
         # Encoder layers
         self.input_block = nn.Sequential(
@@ -89,9 +90,12 @@ def train_model():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Create dataset and dataloader
-    train_dataset_full = DrivingDataset("../../data/sequence.0", augment=True)
-    val_dataset_full = DrivingDataset("../../data/sequence.0", augment=False)
+    # Create dataset and dataloader (resolve data path relative to this script)
+    # Determine project root (two levels up from segmentation/train)
+    project_root = Path(__file__).resolve().parent.parent.parent
+    data_dir = project_root / 'data' / 'sequence.0'
+    train_dataset_full = DrivingDataset(data_dir, augment=True)
+    val_dataset_full = DrivingDataset(data_dir, augment=False)
     
     # Split into train/val (80/20)
     train_size = int(0.8 * len(train_dataset_full))
@@ -114,10 +118,11 @@ def train_model():
     print(f"Val samples: {len(val_dataset)}")
 
     # Create model
-    model = UNetResNet18(num_classes=5).to(device)
+    model = UNetResNet18(num_classes=6).to(device)  # Update to 6 classes
 
     # Loss and optimizer
-    criterion = nn.CrossEntropyLoss()
+    # Ignore unknown/unlabeled class (index 5) during loss computation
+    criterion = nn.CrossEntropyLoss(ignore_index=5)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Training loop
