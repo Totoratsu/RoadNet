@@ -81,6 +81,7 @@ public class test_python : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(FrameCapturingInterval);
+            // Also tried this w/ WaitForEndOfFrame, but it had weird behaviour in the compiled project
             yield return null; // Wait for the next frame to end (for rendering)
 
             var rt = new RenderTexture(width, height, 24);

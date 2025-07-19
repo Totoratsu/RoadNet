@@ -1,7 +1,7 @@
 ## Project binaries
-/Assets/Low Poly Simple Urban City 3D Asset Pack
-/Assets/YughuesFreeGroundMaterials
-/Assets/TextMesh Pro
+#/Assets/Low Poly Simple Urban City 3D Asset Pack
+#/Assets/YughuesFreeGroundMaterials
+#/Assets/TextMesh Pro
 /Assets/StreamingAssets/embedded-python
 
 # This .gitignore file should be placed at the root of your Unity project directory
