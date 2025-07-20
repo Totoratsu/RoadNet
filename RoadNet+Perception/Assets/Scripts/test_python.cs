@@ -10,6 +10,7 @@ public class test_python : MonoBehaviour
 {
     public enum Models
     {
+        driving_segmentation_fast,
         best_model_fast
     };
 
@@ -24,7 +25,6 @@ public class test_python : MonoBehaviour
 
     [Header("Python Segmentation Model\'s Settings")]
     public Models selectedModel;
-    //private PyObject _pythonModule;
     private PyObject _inferenceModel;
     private PyObject _inferenceFunction;
 
@@ -43,11 +43,11 @@ public class test_python : MonoBehaviour
                     .InvokeMethod("append", new PyTuple(new[] { new PyString(pyDir) }));
 
                 using PyObject modules = sys.GetAttr("modules");
-                using PyObject key = new PyString("inference.inference_core");
+                using PyObject key = new PyString("inference.inference_fast");
                 using PyObject popped = modules.InvokeMethod(
                         "pop", new PyTuple(new[] { key, PyObject.None }));
 
-                pythonModule = Py.Import("inference.inference_core");
+                pythonModule = Py.Import("inference.inference_fast");
             }
 
             // Load selected Inference model
@@ -71,29 +71,20 @@ public class test_python : MonoBehaviour
 
         // Embedded Python's "Garbage Collector"
         _inferenceModel.Dispose();
-
-        if (PythonEngine.IsInitialized)
-            PythonEngine.Shutdown();
     }
 
     void Start()
     {
         // Setup RenderTexture object for frame capturing subroutine
-        _rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+        _rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
         _rt.Create();
-
-        // Setup Camera Command Buffer in order to avoid GPU sincronization
-        // and camera jittering during gameplay by using unity's own render pipeline
-        _cameraCB = new CommandBuffer { name = "CaptureFrameCB" };
-        _cameraCB.Blit(BuiltinRenderTextureType.CameraTarget, _rt);
-        mainCamera.AddCommandBuffer(CameraEvent.AfterEverything, _cameraCB);
 
         _frameAnalysisCoroutine = StartCoroutine(
             CaptureFrameLoop()
         );
     }
 
-    void AnalizeFrame(AsyncGPUReadbackRequest req)
+    void OnReadback(AsyncGPUReadbackRequest req)
     {
         if (req.hasError)
         {
@@ -101,19 +92,39 @@ public class test_python : MonoBehaviour
             return;
         }
 
-        byte[] data = req.GetData<byte>().ToArray();
+        Color32[] rawPixels = req.GetData<Color32>().ToArray();
+        int w = _rt.width;
+        int h = _rt.height;
 
-        using (Py.GIL())
+        // 1) Flip vertical: crea un nuevo array y copia fila por fila invertida
+        Color32[] flipped = new Color32[rawPixels.Length];
+        for (int y = 0; y < h; y++)
         {
-            // Convierte los bytes de C# a PyBytes
-            using PyObject pyBytes = PyObject.FromManagedObject(data);
-            // Llama a la función Python
-            PyObject pyResult = _inferenceFunction.Invoke(pyBytes);
+            int srcRow = y * w;
+            int dstRow = (h - 1 - y) * w;
+            Array.Copy(rawPixels, srcRow, flipped, dstRow, w);
+        }
 
-            // Convierte el resultado (también bytes) de nuevo a byte[]
-            byte[] resultBytes = pyResult.As<byte[]>();
+        // 2) Crea y llena la textura en CPU con los píxeles ya volteados
+        var tmp = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tmp.SetPixels32(flipped);
+        tmp.Apply();
 
-            Debug.Log(resultBytes[0]);
+        // 3) Codifica la textura a PNG
+        byte[] pngBytes = tmp.EncodeToPNG();
+        Destroy(tmp);
+
+        try
+        {
+            using (Py.GIL())
+            {
+                using var pyBytes = PyObject.FromManagedObject(pngBytes);
+                _inferenceFunction.Invoke(pyBytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error en inferencia Python: {ex}");
         }
     }
 
@@ -124,12 +135,14 @@ public class test_python : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(frameCapturingInterval);
-            // Also tried this w/ WaitForEndOfFrame, but it had weird behaviour in the compiled project
-            yield return null; // Wait for the next frame to end (for rendering)
+            yield return new WaitForEndOfFrame(); // Cambiado de null a WaitForEndOfFrame
+            
+            Debug.Log("Iniciando captura de frame...");
 
-            // Send an asynchronous request to the RenderTexture associated with the
-            // Camera buffer in order to take a picture of the current frame
-            AsyncGPUReadback.Request(_rt, 0, TextureFormat.RGBA32, AnalizeFrame);
+            Graphics.Blit(null, _rt);
+
+            // Pide la lectura asíncrona directamente sobre _rt
+            AsyncGPUReadback.Request(_rt, 0, TextureFormat.RGBA32, OnReadback);
         }
     }
 }
