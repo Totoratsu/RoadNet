@@ -7,18 +7,14 @@ from pathlib import Path
 import sys
 import os
 import io
+import segmentation_models_pytorch as smp
 
-# Add the train directory to the path to import the model
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'train'))
-from train import UNetResNet18
-
-
-class DrivingSegmentationInference:
+class DrivingSegmentationInferenceStable:
     """
-    Inference class for driving segmentation model.
+    Inference class for driving segmentation model using smp.Unet (stable version).
     
     Usage:
-        predictor = DrivingSegmentationInference()
+        predictor = DrivingSegmentationInferenceStable()
         colored_mask = predictor("path/to/image.jpg", save=True)
     """
     
@@ -29,7 +25,7 @@ class DrivingSegmentationInference:
         2: (83, 21, 168),    # car - purple
         3: (255, 0, 0),      # traffic_light - red
         4: (255, 0, 121),    # road_block - pink
-        255: (0, 0, 0),      # unknown/unlabeled - black
+        5: (0, 0, 0),        # unknown/unlabeled - black
     }
     
     def __init__(self, model_path=None, device=None):
@@ -38,7 +34,7 @@ class DrivingSegmentationInference:
         
         Args:
             model_path: Path to model weights (.pth file). 
-                       Default: '../checkpoints/driving_segmentation_model.pth'
+                       Default: '../checkpoints_stable/driving_segmentation_stable.pth'
             device: Device to run inference on. Auto-detects if None.
         """
         # Set device
@@ -51,7 +47,7 @@ class DrivingSegmentationInference:
         
         # Set model path
         if model_path is None:
-            model_path = '../checkpoints/driving_segmentation_model.pth'
+            model_path = '../checkpoints/driving_segmentation_stable.pth'
         
         self.model_path = Path(model_path)
         
@@ -62,8 +58,14 @@ class DrivingSegmentationInference:
     
     def _load_model(self):
         """Load the trained model"""
-        # Create model (same as training)
-        model = UNetResNet18(num_classes=5)
+        # Create model (same as stable training)
+        model = smp.Unet(
+            encoder_name="mobilenet_v2",
+            encoder_weights="imagenet",
+            in_channels=3,
+            classes=6,
+            activation=None
+        )
 
         # Load weights
         if not self.model_path.exists():
@@ -162,7 +164,7 @@ class DrivingSegmentationInference:
         # Save if requested
         if save:
             image_name = Path(image_path).stem
-            output_path = f"{image_name}_segmentation.png"
+            output_path = f"{image_name}_segmentation_stable.png"
             colored_mask.save(output_path)
             print(f"Segmentation saved as: {output_path}")
         
@@ -171,15 +173,15 @@ class DrivingSegmentationInference:
 if __name__ == "__main__":
     # Example usage
     if len(sys.argv) < 2:
-        print("Usage: python inference.py <image_path>")
+        print("Usage: python inference_stable.py <image_path>")
         sys.exit(1)
     
     image_path = sys.argv[1]
     
     # Create predictor
-    predictor = DrivingSegmentationInference()
+    predictor = DrivingSegmentationInferenceStable()
     
     # Make prediction (save by default in command line)
     result = predictor(image_path, save=True)
     
-    print("\n✅ Inference complete!")
+    print("\n✅ Stable inference complete!")

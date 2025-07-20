@@ -13,7 +13,8 @@ def train_stable_model():
     print(f"Using device: {device}")
 
     # Resolve data directory (same as train.py)
-    project_root = Path(__file__).resolve().parent.parent
+    # Determine project root (two levels above segmentation/train)
+    project_root = Path(__file__).resolve().parent.parent.parent
     data_dir = project_root / 'data' / 'sequence.0'
 
     # Create datasets and dataloaders
@@ -35,7 +36,7 @@ def train_stable_model():
     criterion = nn.CrossEntropyLoss(ignore_index=5)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    num_epochs = 20
+    num_epochs = 5
     for epoch in range(num_epochs):
         # Training
         model.train()

@@ -126,7 +126,7 @@ def train_model():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Training loop
-    num_epochs = 50
+    num_epochs = 20
 
     for epoch in range(num_epochs):
         model.train()
