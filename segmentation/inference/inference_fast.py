@@ -8,10 +8,83 @@ import sys
 import os
 import io
 
-# Add the train directory to the path to import the model
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'train'))
-from train_fast import UNetResNet18
+class UNetResNet18(nn.Module):
+    def __init__(self, num_classes=5):
+        super().__init__()  # Initialize the parent class
+        resnet = models.resnet18(pretrained=True)
+        # Encoder layers
+        self.input_block = nn.Sequential(
+            resnet.conv1, resnet.bn1, resnet.relu
+        )
+        self.maxpool = resnet.maxpool
+        self.encoder1 = resnet.layer1  # 64
+        self.encoder2 = resnet.layer2  # 128
+        self.encoder3 = resnet.layer3  # 256
+        self.encoder4 = resnet.layer4  # 512
 
+        # Decoder layers (upsample + skip connection)
+        self.up4 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.dec4 = nn.Sequential(
+            nn.Conv2d(256 + 256, 256, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()
+        )
+        self.up3 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.dec3 = nn.Sequential(
+            nn.Conv2d(128 + 128, 128, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(128, 128, 3, padding=1), nn.ReLU()
+        )
+        self.up2 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        self.dec2 = nn.Sequential(
+            nn.Conv2d(64 + 64, 64, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding=1), nn.ReLU()
+        )
+        self.up1 = nn.ConvTranspose2d(64, 64, kernel_size=2, stride=2)
+        self.dec1 = nn.Sequential(
+            nn.Conv2d(64 + 64, 64, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding=1), nn.ReLU()
+        )
+        self.final = nn.Conv2d(64, num_classes, 1)
+
+    def forward(self, x):
+        # Encoder
+        x0 = self.input_block(x)      # (B, 64, H/2, W/2)
+        x1 = self.maxpool(x0)         # (B, 64, H/4, W/4)
+        x2 = self.encoder1(x1)        # (B, 64, H/4, W/4)
+        x3 = self.encoder2(x2)        # (B, 128, H/8, W/8)
+        x4 = self.encoder3(x3)        # (B, 256, H/16, W/16)
+        x5 = self.encoder4(x4)        # (B, 512, H/32, W/32)
+
+        # Decoder with skip connections (resize skip if needed)
+        def match_size(src, target):
+            if src.shape[2:] != target.shape[2:]:
+                src = torch.nn.functional.interpolate(src, size=target.shape[2:], mode='bilinear', align_corners=False)
+            return src
+
+        d4 = self.up4(x5)             # (B, 256, H/16, W/16)
+        x4m = match_size(x4, d4)
+        d4 = torch.cat([d4, x4m], dim=1)
+        d4 = self.dec4(d4)
+
+        d3 = self.up3(d4)             # (B, 128, H/8, W/8)
+        x3m = match_size(x3, d3)
+        d3 = torch.cat([d3, x3m], dim=1)
+        d3 = self.dec3(d3)
+
+        d2 = self.up2(d3)             # (B, 64, H/4, W/4)
+        x2m = match_size(x2, d2)
+        d2 = torch.cat([d2, x2m], dim=1)
+        d2 = self.dec2(d2)
+
+        d1 = self.up1(d2)             # (B, 64, H/2, W/2)
+        x0m = match_size(x0, d1)
+        d1 = torch.cat([d1, x0m], dim=1)
+        d1 = self.dec1(d1)
+
+        out = self.final(d1)
+        # Upsample to input size
+        out = torch.nn.functional.interpolate(out, size=(x.shape[2], x.shape[3]), mode='bilinear', align_corners=False)
+        return out
+    
 class DrivingSegmentationInference:
     """
     Inference class for driving segmentation model.
