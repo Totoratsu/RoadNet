@@ -1761,7 +1761,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6965507359214627342, guid: fd43df78b5323eb428d9dbb676233627, type: 3}
       propertyPath: thrust
-      value: 900
+      value: 1050
       objectReference: {fileID: 0}
     - target: {fileID: 6965507359214627342, guid: fd43df78b5323eb428d9dbb676233627, type: 3}
       propertyPath: rotAngle
