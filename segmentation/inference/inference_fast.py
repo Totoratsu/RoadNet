@@ -178,8 +178,8 @@ class DrivingSegmentationInference:
         
         return Image.fromarray(colored)
     
-    def predict_bytes(self, image_bytes: bytes) -> bytes:
-        """Run inference on image bytes and return PNG bytes of colored mask"""
+    def predict_bytes(self, image_bytes: bytes) -> tuple[bytes, bool]:
+        """Run inference on image bytes and return PNG bytes of colored mask + red pixel detection"""
         # Load image from bytes
         buf = io.BytesIO(image_bytes)
         image = Image.open(buf)
@@ -195,13 +195,34 @@ class DrivingSegmentationInference:
         # Convert to numpy mask
         pred_mask = predictions.cpu().numpy()[0]
         
+        # Check for many red pixels
+        many_red_pixels = self._check_traffic_lights(pred_mask)
+        
         # Create colored mask
         colored_mask = self._create_colored_mask(pred_mask)
         
         # Save to PNG bytes
         out_buf = io.BytesIO()
         colored_mask.save(out_buf, format='PNG')
-        return out_buf.getvalue()
+        return out_buf.getvalue(), many_red_pixels
+
+    def _check_traffic_lights(self, pred_mask, threshold_percent=0.5):
+        """
+        Check if there are many red pixels (traffic lights - class 3)
+        
+        Args:
+            pred_mask: Predicted segmentation mask
+            threshold_percent: Percentage threshold for "many" red pixels (default: 0.1%)
+            
+        Returns:
+            bool: True if many traffic light pixels detected
+        """
+        total_pixels = pred_mask.size
+        traffic_light_pixels = np.sum(pred_mask == 3)
+        traffic_light_percentage = (traffic_light_pixels / total_pixels) * 100
+
+        print(f"Traffic light pixel percentage: {traffic_light_percentage:.2f}%")
+        return traffic_light_percentage >= threshold_percent
 
     def __call__(self, image_path, save=False):
         """
@@ -212,7 +233,10 @@ class DrivingSegmentationInference:
             save: Whether to save the result (default: False)
             
         Returns:
-            PIL.Image: Colored segmentation mask
+            dict: {
+                'colored_mask': PIL.Image - Colored segmentation mask,
+                'many_red_pixels': bool - True if many traffic light pixels detected
+            }
         """
         # Load image
         image = Image.open(image_path)
@@ -228,6 +252,9 @@ class DrivingSegmentationInference:
         # Convert to numpy
         pred_mask = predictions.cpu().numpy()[0]  # Remove batch dimension
         
+        # Check for many red pixels (traffic lights)
+        many_red_pixels = self._check_traffic_lights(pred_mask)
+        
         # Create colored visualization
         colored_mask = self._create_colored_mask(pred_mask)
         
@@ -237,8 +264,12 @@ class DrivingSegmentationInference:
             output_path = f"{image_name}_segmentation.png"
             colored_mask.save(output_path)
             print(f"Segmentation saved as: {output_path}")
+            print(f"Many red pixels detected: {many_red_pixels}")
         
-        return colored_mask
+        return {
+            'colored_mask': colored_mask,
+            'many_red_pixels': many_red_pixels
+        }
 
 if __name__ == "__main__":
     # Example usage
@@ -254,4 +285,5 @@ if __name__ == "__main__":
     # Make prediction (save by default in command line)
     result = predictor(image_path, save=True)
     
-    print("\n✅ Inference complete!")
+    print(f"\n✅ Inference complete!")
+    print(f"Many red pixels detected: {result['many_red_pixels']}")
