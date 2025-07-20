@@ -178,8 +178,8 @@ class DrivingSegmentationInference:
         
         return Image.fromarray(colored)
     
-    def predict_bytes(self, image_bytes: bytes) -> tuple[bytes, bool]:
-        """Run inference on image bytes and return PNG bytes of colored mask + red pixel detection"""
+    def predict_bytes(self, image_bytes: bytes) -> tuple[bytes, bool, list]:
+        """Run inference on image bytes and return PNG bytes of colored mask + red pixel detection + coordinates"""
         # Load image from bytes
         buf = io.BytesIO(image_bytes)
         image = Image.open(buf)
@@ -196,7 +196,7 @@ class DrivingSegmentationInference:
         pred_mask = predictions.cpu().numpy()[0]
         
         # Check for many red pixels
-        many_red_pixels = self._check_traffic_lights(pred_mask)
+        many_red_pixels, traffic_light_coords = self._check_traffic_lights(pred_mask)
         
         # Create colored mask
         colored_mask = self._create_colored_mask(pred_mask)
@@ -204,7 +204,7 @@ class DrivingSegmentationInference:
         # Save to PNG bytes
         out_buf = io.BytesIO()
         colored_mask.save(out_buf, format='PNG')
-        return out_buf.getvalue(), many_red_pixels
+        return out_buf.getvalue(), many_red_pixels, traffic_light_coords
 
     def _check_traffic_lights(self, pred_mask, threshold_percent=0.5):
         """
@@ -212,17 +212,28 @@ class DrivingSegmentationInference:
         
         Args:
             pred_mask: Predicted segmentation mask
-            threshold_percent: Percentage threshold for "many" red pixels (default: 0.1%)
+            threshold_percent: Percentage threshold for "many" red pixels (default: 0.5%)
             
         Returns:
-            bool: True if many traffic light pixels detected
+            tuple: (bool, list) - (True if many traffic light pixels detected, list of coordinates)
         """
         total_pixels = pred_mask.size
         traffic_light_pixels = np.sum(pred_mask == 3)
         traffic_light_percentage = (traffic_light_pixels / total_pixels) * 100
 
         print(f"Traffic light pixel percentage: {traffic_light_percentage:.2f}%")
-        return traffic_light_percentage >= threshold_percent
+        
+        # Get coordinates of traffic light pixels
+        traffic_light_coords = []
+        if traffic_light_percentage >= threshold_percent:
+            # Find all traffic light pixel coordinates
+            y_coords, x_coords = np.where(pred_mask == 3)
+            
+            # Return up to 2 coordinates (first two found)
+            for i in range(min(2, len(y_coords))):
+                traffic_light_coords.append((int(x_coords[i]), int(y_coords[i])))
+        
+        return traffic_light_percentage >= threshold_percent, traffic_light_coords
 
     def __call__(self, image_path, save=False):
         """
@@ -235,7 +246,8 @@ class DrivingSegmentationInference:
         Returns:
             dict: {
                 'colored_mask': PIL.Image - Colored segmentation mask,
-                'many_red_pixels': bool - True if many traffic light pixels detected
+                'many_red_pixels': bool - True if many traffic light pixels detected,
+                'traffic_light_coords': list - List of (x, y) coordinates of traffic light pixels
             }
         """
         # Load image
@@ -253,7 +265,7 @@ class DrivingSegmentationInference:
         pred_mask = predictions.cpu().numpy()[0]  # Remove batch dimension
         
         # Check for many red pixels (traffic lights)
-        many_red_pixels = self._check_traffic_lights(pred_mask)
+        many_red_pixels, traffic_light_coords = self._check_traffic_lights(pred_mask)
         
         # Create colored visualization
         colored_mask = self._create_colored_mask(pred_mask)
@@ -265,10 +277,13 @@ class DrivingSegmentationInference:
             colored_mask.save(output_path)
             print(f"Segmentation saved as: {output_path}")
             print(f"Many red pixels detected: {many_red_pixels}")
+            if traffic_light_coords:
+                print(f"Traffic light coordinates: {traffic_light_coords}")
         
         return {
             'colored_mask': colored_mask,
-            'many_red_pixels': many_red_pixels
+            'many_red_pixels': many_red_pixels,
+            'traffic_light_coords': traffic_light_coords
         }
 
 if __name__ == "__main__":
@@ -287,3 +302,5 @@ if __name__ == "__main__":
     
     print(f"\n✅ Inference complete!")
     print(f"Many red pixels detected: {result['many_red_pixels']}")
+    if result['traffic_light_coords']:
+        print(f"Traffic light coordinates: {result['traffic_light_coords']}")
