@@ -8,7 +8,14 @@ public class PrePythonInit : MonoBehaviour
 {
     void Awake()
     {
+        // Setup python binaries and libraries
         Runtime.PythonDLL = Path.Combine(Application.streamingAssetsPath, "embedded-python", "python312.dll");
         PythonEngine.Initialize();
+    }
+
+    void OnDestroy()
+    {
+        if (PythonEngine.IsInitialized)
+            PythonEngine.Shutdown();
     }
 }

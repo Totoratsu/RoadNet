@@ -1,3 +1,5 @@
+.plastic
+
 ## Project binaries
 #/Assets/Low Poly Simple Urban City 3D Asset Pack
 #/Assets/YughuesFreeGroundMaterials
@@ -6,6 +8,7 @@
 
 ## Duplicated python code for unity
 /Assets/StreamingAssets/python/inference
+/Assets/StreamingAssets/python/train
 
 # This .gitignore file should be placed at the root of your Unity project directory
 #
